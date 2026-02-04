@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Video, Play, Square, RefreshCcw, BookOpen, Activity, Volume2, AlertCircle, CheckCircle, Hand, AlertTriangle, Sparkles } from 'lucide-react';
 import * as poseDetection from '@tensorflow-models/pose-detection';
+import { initializeHands, closeHands, analyzeHandGestures, drawHands } from './utils/handDetection';
 
 const SpeechCoachApp = () => {
   const [activeTab, setActiveTab] = useState('combined'); // 'combined', 'memorize', or 'camera'
@@ -67,6 +68,7 @@ const CombinedSessionMode = () => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [fillerStats, setFillerStats] = useState({ count: 0, found: [] });
   const [poseStats, setPoseStats] = useState({ posture: 'neutral', gestures: 0, engagement: 0 });
+  const [handStats, setHandStats] = useState({ handCount: 0, openPalms: 0, pointingGestures: 0, handActivity: 0 });
   const [feedback, setFeedback] = useState([]);
   const [error, setError] = useState(null);
   const [recording, setRecording] = useState(false);
@@ -74,9 +76,11 @@ const CombinedSessionMode = () => {
   // Referencias
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const handCanvasRef = useRef(null);
   const recognitionRef = useRef(null);
   const streamRef = useRef(null);
   const detectorRef = useRef(null);
+  const handsRef = useRef(null);
   const animationFrameRef = useRef(null);
   const lastImageDataRef = useRef(null);
   const poseHistoryRef = useRef([]);
@@ -169,6 +173,7 @@ const CombinedSessionMode = () => {
       setInterimTranscript('');
       setFillerStats({ count: 0, found: [] });
       setPoseStats({ posture: 'neutral', gestures: 0, engagement: 0 });
+      setHandStats({ handCount: 0, openPalms: 0, pointingGestures: 0, handActivity: 0 });
 
       // Obtener stream de cámara y audio
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -178,7 +183,6 @@ const CombinedSessionMode = () => {
 
       streamRef.current = stream;
       
-      // Mostrar video PRIMERO
       setStep('recording');
       setRecording(true);
 
@@ -204,6 +208,16 @@ const CombinedSessionMode = () => {
       isRecordingRef.current = true;
       await initializePoseDetector();
       setupAudioAnalysis(stream);
+
+      // Inicializar MediaPipe Hands
+      if (handCanvasRef.current) {
+        const onHandResults = (results) => {
+          drawHands(handCanvasRef.current, results);
+          const gestures = analyzeHandGestures(results);
+          setHandStats(gestures);
+        };
+        handsRef.current = await initializeHands(videoRef.current, onHandResults);
+      }
 
       // INICIAR RECONOCIMIENTO DE VOZ
       if (recognitionRef.current) {
@@ -321,6 +335,8 @@ const CombinedSessionMode = () => {
     if (audioContextRef.current) {
       audioContextRef.current.close();
     }
+
+    closeHands();
 
     // Analizar resultados
     const finalTranscript = transcript + interimTranscript;
@@ -482,11 +498,12 @@ Sé directo, constructivo y motivador. Máximo 200 palabras.`;
               </div>
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Grabando...</h2>
-            <p className="text-slate-600">Habla con claridad. Estamos analizando tu voz, gestos y postura.</p>
+            <p className="text-slate-600">Habla con claridad. Analizamos tu voz, postura y gestos de manos.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
+              <p className="text-xs font-semibold text-slate-500 mb-2">VIDEO</p>
               <video
                 ref={videoRef}
                 className="w-full rounded-lg border-2 border-indigo-600 shadow-lg"
@@ -494,22 +511,31 @@ Sé directo, constructivo y motivador. Máximo 200 palabras.`;
                 muted
               />
             </div>
-            <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-lg">
-                <p className="text-xs text-slate-500 font-semibold mb-2">TRANSCRIPCIÓN EN VIVO</p>
-                <p className="text-sm text-slate-700 h-24 overflow-y-auto">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-2">DETECCIÓN DE MANOS</p>
+              <canvas
+                ref={handCanvasRef}
+                className="w-full rounded-lg border-2 border-green-600 shadow-lg bg-black"
+                width={320}
+                height={240}
+              />
+            </div>
+            <div className="space-y-3">
+              <div className="bg-slate-50 p-3 rounded-lg">
+                <p className="text-xs text-slate-500 font-semibold mb-2">TRANSCRIPCIÓN</p>
+                <p className="text-sm text-slate-700 h-20 overflow-y-auto">
                   {transcript}
                   <span className="text-slate-400 italic">{interimTranscript}</span>
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-blue-50 p-3 rounded">
+                <div className="bg-blue-50 p-2 rounded text-center">
                   <p className="text-xs text-blue-600 font-semibold">Muletillas</p>
-                  <p className="text-xl font-bold text-blue-700">{fillerStats.count}</p>
+                  <p className="text-lg font-bold text-blue-700">{fillerStats.count}</p>
                 </div>
-                <div className="bg-green-50 p-3 rounded">
-                  <p className="text-xs text-green-600 font-semibold">Gestos</p>
-                  <p className="text-xl font-bold text-green-700">{poseStats.gestures}%</p>
+                <div className="bg-green-50 p-2 rounded text-center">
+                  <p className="text-xs text-green-600 font-semibold">Manos Detectadas</p>
+                  <p className="text-lg font-bold text-green-700">{handStats.handCount}</p>
                 </div>
               </div>
             </div>
@@ -528,26 +554,25 @@ Sé directo, constructivo y motivador. Máximo 200 palabras.`;
         <div className="space-y-8">
           <div className="text-center border-b border-slate-100 pb-6">
             <h2 className="text-2xl font-bold text-slate-800">Resultados de tu Sesión</h2>
-            <p className="text-slate-600 mt-2">Análisis completado con IA</p>
+            <p className="text-slate-600 mt-2">Análisis completado con IA y MediaPipe</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-              <p className="text-blue-600 font-semibold mb-2">Muletillas</p>
-              <p className="text-4xl font-bold text-blue-700">{fillerStats.count}</p>
-              {fillerStats.found.length > 0 && (
-                <p className="text-xs text-blue-600 mt-2">
-                  Encontradas: {fillerStats.found.join(', ')}
-                </p>
-              )}
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+              <p className="text-blue-600 font-semibold mb-1 text-sm">Muletillas</p>
+              <p className="text-3xl font-bold text-blue-700">{fillerStats.count}</p>
             </div>
-            <div className="bg-green-50 p-6 rounded-xl border border-green-100">
-              <p className="text-green-600 font-semibold mb-2">Actividad de Gestos</p>
-              <p className="text-4xl font-bold text-green-700">{poseStats.gestures}%</p>
+            <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+              <p className="text-green-600 font-semibold mb-1 text-sm">Gestos (Pose)</p>
+              <p className="text-3xl font-bold text-green-700">{poseStats.gestures}%</p>
             </div>
-            <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
-              <p className="text-purple-600 font-semibold mb-2">Postura</p>
-              <p className="text-2xl font-bold text-purple-700">{poseStats.posture}</p>
+            <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+              <p className="text-purple-600 font-semibold mb-1 text-sm">Palmas Abiertas</p>
+              <p className="text-3xl font-bold text-purple-700">{handStats.openPalms}</p>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+              <p className="text-orange-600 font-semibold mb-1 text-sm">Gestos Apuntar</p>
+              <p className="text-3xl font-bold text-orange-700">{handStats.pointingGestures}</p>
             </div>
           </div>
 
@@ -567,6 +592,7 @@ Sé directo, constructivo y motivador. Máximo 200 palabras.`;
               setInterimTranscript('');
               setFillerStats({ count: 0, found: [] });
               setPoseStats({ posture: 'neutral', gestures: 0, engagement: 0 });
+              setHandStats({ handCount: 0, openPalms: 0, pointingGestures: 0, handActivity: 0 });
               setFeedback([]);
             }}
             className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"

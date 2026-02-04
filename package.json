@@ -15,7 +15,8 @@
     "@tensorflow/tfjs": "^4.22.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@mediapipe/hands": "^0.4.1646424305"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
