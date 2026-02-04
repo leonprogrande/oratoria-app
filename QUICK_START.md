@@ -1,0 +1,238 @@
+# 🎤 Oratoria Pro - Setup Rápido
+
+## ⚡ Quick Start (5 minutos)
+
+### 1️⃣ Instalar Ollama
+Ejecuta este archivo en la raíz del proyecto:
+```bash
+instalar-ollama.bat
+```
+
+O manualmente:
+- Descargar: https://ollama.ai/download
+- Instalar
+- En terminal: `ollama pull mistral`
+
+### 2️⃣ Iniciar Ollama
+Abre una terminal y ejecuta:
+```bash
+ollama serve
+```
+
+Verás: `Server listening on 127.0.0.1:11434`
+
+**⚠️ Mantén esta terminal abierta mientras usas la app**
+
+### 3️⃣ Iniciar la App
+En OTRA terminal:
+```bash
+npm run dev
+```
+
+Abre: http://localhost:5173
+
+### 4️⃣ Usar la Sesión Completa
+1. Haz clic en la pestaña **"Sesión Completa"** (arriba)
+2. Haz clic en **"Comenzar Sesión"**
+3. Permite cámara + micrófono
+4. **Habla durante 1-2 minutos**
+5. Haz clic en **"Terminar Grabación"**
+6. **¡Espera 2-5 segundos** para el análisis con IA
+7. Ver feedback personalizado
+
+---
+
+## 🎯 Qué Analiza
+
+✅ **Muletillas** - Palabras relleno (eh, este, o sea, etc.)
+✅ **Gestos** - Actividad de manos y brazos
+✅ **Postura** - Alineación de cabeza y hombros
+✅ **IA Feedback** - Recomendaciones personalizadas
+
+---
+
+## 🏗️ Arquitectura
+
+```
+Frontend (React 19 + Vite)
+    ↓
+    ├─ Web Speech Recognition API (Local)
+    ├─ TensorFlow.js + MediaPipe Pose (Local)
+    └─ Web Audio API (Local)
+    ↓
+Ollama Local API (http://localhost:11434)
+    ↓
+AI Models (Mistral, Phi, Neural-Chat, etc.)
+```
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+oratoria-app/
+├── src/
+│   ├── App.jsx                 ← Código principal (3 componentes)
+│   ├── App.css
+│   ├── index.css
+│   └── main.jsx
+├── public/
+├── .github/
+│   └── copilot-instructions.md ← Guía para AI agents
+├── OLLAMA_SETUP.md             ← Setup detallado de Ollama
+├── IA_SETUP.md                 ← Comparativa de IA options
+├── instalar-ollama.bat         ← Script de instalación
+├── vite.config.js
+├── tailwind.config.js
+├── package.json
+└── README.md
+```
+
+---
+
+## 🔧 Componentes React
+
+### 1. **SpeechCoachApp** (Root)
+- Navación con 3 tabs
+- Renderiza el componente activo
+
+### 2. **CombinedSessionMode** (NUEVO)
+- Sesión completa con IA
+- Graba video + audio
+- Analiza muletillas, gestos, postura
+- Genera feedback con Ollama
+
+### 3. **MemorizeMode** (Existente)
+- Memorización de texto
+- Detección de muletillas
+- Análisis sin IA
+
+### 4. **CameraMode** (Existente)
+- Análisis de movimiento
+- Análisis de audio
+- Feedback básico en tiempo real
+
+---
+
+## 🚀 Comandos Útiles
+
+```bash
+# Desarrollo
+npm run dev              # Inicia servidor en http://localhost:5173
+
+# Build
+npm run build           # Crea dist/ para producción
+npm run preview         # Sirve dist/ localmente
+
+# Linting
+npm run lint            # Valida código con ESLint
+
+# Ollama
+ollama serve            # Inicia API local (puerto 11434)
+ollama pull mistral     # Descarga modelo Mistral
+ollama pull phi         # Descarga modelo Phi (más rápido)
+```
+
+---
+
+## 🔌 Dependencias Principales
+
+```json
+{
+  "react": "^19.2.0",                           // Framework UI
+  "react-dom": "^19.2.0",                       // DOM rendering
+  "lucide-react": "^0.563.0",                   // Icons
+  "@tensorflow/tfjs": "latest",                 // ML framework
+  "@tensorflow-models/pose-detection": "latest", // Pose detection
+  "@mediapipe/pose": "latest"                   // MediaPipe models
+}
+```
+
+---
+
+## 🎨 UI Features
+
+- **Tailwind CSS**: Styling (sin custom CSS)
+- **Color scheme**: Indigo primary, slate neutrals
+- **Responsive**: Mobile-friendly (`md:` breakpoint)
+- **Icons**: Lucide React (24+ icons usados)
+- **Animations**: Pulse, ping para feedback visual
+
+---
+
+## 📊 Métricas Capturadas
+
+### Por Sesión:
+- `transcript`: Texto completo de lo grabado
+- `fillerStats.count`: Total de muletillas
+- `fillerStats.found`: Lista de muletillas únicas
+- `poseStats.gestures`: Porcentaje de actividad (0-100%)
+- `poseStats.posture`: Calidad de postura ('neutral' o 'excelente')
+- `feedback`: Array de consejos de IA
+
+---
+
+## ⚙️ Configuración
+
+### Cambiar Modelo de Ollama
+Edita `App.jsx` línea ~130:
+```javascript
+model: "mistral"  // Cambia a: phi, neural-chat, llama2
+```
+
+### Ajustar Temperatura (Creatividad)
+```javascript
+temperature: 0.7  // 0.0 (determinista) a 1.0 (creativo)
+```
+
+### Modificar Muletillas Detectadas
+Edita `App.jsx` línea ~253 (arreglo `fillers`):
+```javascript
+const fillers = ['eh', 'em', 'mm', 'este', ...];
+```
+
+---
+
+## 🐛 Troubleshooting
+
+| Problema | Solución |
+|----------|----------|
+| "Ollama no está disponible" | Ejecuta `ollama serve` en otra terminal |
+| Cámara/micrófono no funciona | Revisa permisos del navegador (icono candado) |
+| Muy lento | Usa modelo `phi` en lugar de `mistral` |
+| Errores de memoria | Cierra otras apps, usa `phi` |
+| No aparece feedback IA | Espera 5-10 segundos, revisa consola (F12) |
+
+---
+
+## 📚 Documentación Adicional
+
+- **OLLAMA_SETUP.md** - Setup detallado de Ollama
+- **IA_SETUP.md** - Comparativa de opciones de IA
+- **.github/copilot-instructions.md** - Guía para AI agents
+
+---
+
+## 🎓 Próximas Features
+
+- [ ] Guardar sesiones en localStorage
+- [ ] Exportar resultados como PDF
+- [ ] Análisis de emociones
+- [ ] Comparar sesiones anteriores
+- [ ] Versión de escritorio (Electron/Tauri)
+
+---
+
+## 📄 Licencia
+
+MIT - Libre para uso personal y comercial
+
+---
+
+## 🤝 Contribuciones
+
+¡Bienvenido contribuir! Abre un issue o PR en GitHub.
+
+---
+
+**Hecho con ❤️ para oradores que quieren mejorar** 🎤✨

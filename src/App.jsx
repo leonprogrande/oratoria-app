@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Video, Play, Square, RefreshCcw, BookOpen, Activity, Volume2, AlertCircle, CheckCircle, Hand, AlertTriangle } from 'lucide-react';
+import { Mic, Video, Play, Square, RefreshCcw, BookOpen, Activity, Volume2, AlertCircle, CheckCircle, Hand, AlertTriangle, Sparkles } from 'lucide-react';
+import * as poseDetection from '@tensorflow-models/pose-detection';
 
 const SpeechCoachApp = () => {
-  const [activeTab, setActiveTab] = useState('memorize'); // 'memorize' or 'camera'
+  const [activeTab, setActiveTab] = useState('combined'); // 'combined', 'memorize', or 'camera'
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800">
@@ -16,37 +17,564 @@ const SpeechCoachApp = () => {
             Oratoria Pro
           </h1>
         </div>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
+        <div className="flex bg-slate-100 p-1 rounded-lg gap-1">
+          <button
+            onClick={() => setActiveTab('combined')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+              activeTab === 'combined' 
+                ? 'bg-white text-indigo-700 shadow-sm' 
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Sparkles size={16} /> Sesión Completa
+          </button>
           <button
             onClick={() => setActiveTab('memorize')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
               activeTab === 'memorize' 
                 ? 'bg-white text-indigo-700 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <BookOpen size={16} /> Memorización
-            </span>
+            <BookOpen size={16} /> Memorización
           </button>
           <button
             onClick={() => setActiveTab('camera')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
               activeTab === 'camera' 
                 ? 'bg-white text-indigo-700 shadow-sm' 
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <span className="flex items-center gap-2">
-              <Video size={16} /> Cámara y Gestos
-            </span>
+            <Video size={16} /> Cámara y Gestos
           </button>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto p-6">
-        {activeTab === 'memorize' ? <MemorizeMode /> : <CameraMode />}
+        {activeTab === 'combined' ? <CombinedSessionMode /> : activeTab === 'memorize' ? <MemorizeMode /> : <CameraMode />}
       </main>
+    </div>
+  );
+};
+
+// --- SESIÓN COMBINADA (GRABACIÓN + ANÁLISIS IA) ---
+
+const CombinedSessionMode = () => {
+  const [step, setStep] = useState('intro'); // intro, recording, results
+  const [isRecording, setIsRecording] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [interimTranscript, setInterimTranscript] = useState('');
+  const [fillerStats, setFillerStats] = useState({ count: 0, found: [] });
+  const [poseStats, setPoseStats] = useState({ posture: 'neutral', gestures: 0, engagement: 0 });
+  const [feedback, setFeedback] = useState([]);
+  const [error, setError] = useState(null);
+  const [recording, setRecording] = useState(false);
+
+  // Referencias
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const streamRef = useRef(null);
+  const detectorRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const lastImageDataRef = useRef(null);
+  const poseHistoryRef = useRef([]);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const isRecordingRef = useRef(false);
+
+  // Inicializar Speech Recognition UNA SOLA VEZ
+  useEffect(() => {
+    const initSpeechRecognition = () => {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'es-ES';
+
+        recognition.onstart = () => {
+          console.log('Speech Recognition iniciado');
+        };
+
+        recognition.onresult = (event) => {
+          if (!isRecordingRef.current) return; // Solo procesar si estamos grabando
+
+          let finalChunk = '';
+          let interimChunk = '';
+
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalChunk += transcript + ' ';
+            } else {
+              interimChunk += transcript;
+            }
+          }
+
+          if (finalChunk) {
+            setTranscript(prev => prev + finalChunk);
+          }
+          setInterimTranscript(interimChunk);
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          if (event.error === 'not-allowed') {
+            setError("❌ Acceso al micrófono denegado. Revisa permisos del navegador (icono candado).");
+          } else if (event.error === 'network') {
+            setError("❌ Error de red. Necesitas conexión a internet.");
+          } else if (event.error !== 'no-speech') {
+            setError(`❌ Error: ${event.error}`);
+          }
+        };
+
+        recognition.onend = () => {
+          console.log('Speech Recognition finalizado');
+        };
+
+        recognitionRef.current = recognition;
+      } else {
+        setError("❌ Tu navegador no soporta reconocimiento de voz. Usa Chrome, Edge o Safari.");
+      }
+    };
+
+    initSpeechRecognition();
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Cargar Pose Detector
+  const initializePoseDetector = async () => {
+    try {
+      const model = poseDetection.SupportedModels.MoveNet;
+      detectorRef.current = await poseDetection.createDetector(model, {
+        modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+      });
+    } catch (err) {
+      console.error("Error cargando modelo de poses:", err);
+    }
+  };
+
+  // Iniciar sesión combinada
+  const startSession = async () => {
+    try {
+      setError(null);
+      setTranscript('');
+      setInterimTranscript('');
+      setFillerStats({ count: 0, found: [] });
+      setPoseStats({ posture: 'neutral', gestures: 0, engagement: 0 });
+
+      // Obtener stream de cámara y audio
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true
+      });
+
+      streamRef.current = stream;
+      
+      // Mostrar video PRIMERO
+      setStep('recording');
+      setRecording(true);
+
+      // Esperar a que el DOM actualice
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Asignar stream al video
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        
+        // Esperar a que el video esté listo
+        await new Promise((resolve) => {
+          const handler = () => {
+            videoRef.current.removeEventListener('loadedmetadata', handler);
+            videoRef.current.play().catch(err => console.error('Error al reproducir video:', err));
+            resolve();
+          };
+          videoRef.current.addEventListener('loadedmetadata', handler);
+        });
+      }
+
+      // Inicializar análisis
+      isRecordingRef.current = true;
+      await initializePoseDetector();
+      setupAudioAnalysis(stream);
+
+      // INICIAR RECONOCIMIENTO DE VOZ
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.warn('Recognition ya está activo:', e.message);
+        }
+      }
+
+      // Iniciar análisis de video
+      analyzeVideo();
+    } catch (err) {
+      isRecordingRef.current = false;
+      if (err.name === 'NotAllowedError') {
+        setError("❌ Acceso denegado. Revisa permisos de cámara/micrófono en el navegador.");
+      } else if (err.name === 'NotFoundError') {
+        setError("❌ No se encontró cámara o micrófono en tu dispositivo.");
+      } else {
+        setError("❌ Error: " + err.message);
+      }
+      console.error('Error completo:', err);
+    }
+  };
+
+  // Configurar análisis de audio
+  const setupAudioAnalysis = (stream) => {
+    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContextRef.current.createMediaStreamSource(stream);
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    source.connect(analyserRef.current);
+  };
+
+  // Analizar video (pose detection)
+  const analyzeVideo = async () => {
+    if (!isRecording && !recording) return;
+
+    if (detectorRef.current && videoRef.current && canvasRef.current) {
+      try {
+        const poses = await detectorRef.current.estimatePoses(videoRef.current);
+        const pose = poses[0];
+
+        if (pose && pose.keypoints) {
+          // Analizar postura
+          const leftShoulder = pose.keypoints.find(k => k.name === 'left_shoulder');
+          const rightShoulder = pose.keypoints.find(k => k.name === 'right_shoulder');
+          const head = pose.keypoints.find(k => k.name === 'nose');
+
+          // Detectar gestos (movimiento de manos)
+          const leftWrist = pose.keypoints.find(k => k.name === 'left_wrist');
+          const rightWrist = pose.keypoints.find(k => k.name === 'right_wrist');
+
+          poseHistoryRef.current.push({
+            leftWrist: leftWrist?.y,
+            rightWrist: rightWrist?.y
+          });
+
+          // Mantener historial limitado
+          if (poseHistoryRef.current.length > 30) {
+            poseHistoryRef.current.shift();
+          }
+
+          // Detectar gestos activos (variación en posición de muñecas)
+          if (poseHistoryRef.current.length > 5) {
+            const recent = poseHistoryRef.current.slice(-5);
+            const leftMovement = Math.max(...recent.map(p => p.leftWrist || 0)) - Math.min(...recent.map(p => p.leftWrist || 0));
+            const rightMovement = Math.max(...recent.map(p => p.rightWrist || 0)) - Math.min(...recent.map(p => p.rightWrist || 0));
+
+            const gestureActivity = Math.round((leftMovement + rightMovement) / 2);
+            setPoseStats(prev => ({ ...prev, gestures: gestureActivity }));
+          }
+
+          // Determinar postura
+          if (head?.y && leftShoulder?.y) {
+            const headShoulder = head.y - leftShoulder.y;
+            const postureType = Math.abs(headShoulder) < 20 ? 'excelente' : 'neutral';
+            setPoseStats(prev => ({ ...prev, posture: postureType }));
+          }
+        }
+
+        animationFrameRef.current = requestAnimationFrame(analyzeVideo);
+      } catch (err) {
+        console.error("Error en análisis de pose:", err);
+        animationFrameRef.current = requestAnimationFrame(analyzeVideo);
+      }
+    } else {
+      animationFrameRef.current = requestAnimationFrame(analyzeVideo);
+    }
+  };
+
+  // Detener sesión y generar análisis
+  const stopSession = async () => {
+    isRecordingRef.current = false;
+    setRecording(false);
+
+    // Detener reconocimiento de voz
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.warn('Error deteniendo recognition:', e);
+      }
+    }
+
+    // Detener stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+
+    // Cancelar animaciones
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+
+    // Analizar resultados
+    const finalTranscript = transcript + interimTranscript;
+    analyzeMuletillas(finalTranscript);
+
+    // Generar feedback
+    await generateAIFeedback(finalTranscript);
+
+    setStep('results');
+  };
+
+  // Contar muletillas
+  const analyzeMuletillas = (text) => {
+    const fillers = ['eh', 'em', 'mm', 'este', 'o sea', 'bueno', 'tipo', 'sabes', 'literal', 'digamos', 'básicamente', 'mhm', 'eee', 'ahh'];
+    const words = text.toLowerCase().split(/\s+/);
+    const foundFillers = words.filter(word => fillers.includes(word.replace(/[^a-záéíóúñ]/g, '')));
+
+    setFillerStats({
+      count: foundFillers.length,
+      found: [...new Set(foundFillers)]
+    });
+  };
+
+  // Generar feedback con Ollama (LOCAL, 100% GRATIS)
+  const generateAIFeedback = async (speechText) => {
+    try {
+      setFeedback(["⏳ Generando feedback con IA local Ollama..."]);
+
+      const prompt = `Eres un coach profesional de oratoria. Analiza el siguiente discurso y proporciona feedback constructivo.
+
+TRANSCRIPCIÓN:
+"${speechText}"
+
+MÉTRICAS DETECTADAS:
+- Muletillas encontradas: ${fillerStats.count}
+- Calidad de postura: ${poseStats.posture}
+- Actividad de gestos: ${poseStats.gestures}%
+
+Por favor, proporciona EXACTAMENTE 3 consejos específicos y prácticos para mejorar:
+1. La eliminación de muletillas
+2. La expresión corporal y gestos
+3. La fluidez y proyección de voz
+
+Sé directo, constructivo y motivador. Máximo 200 palabras.`;
+
+      const response = await fetch("http://localhost:11434/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "mistral", // Usa 'phi' si quieres más rápido (3B), 'neural-chat' para mejor calidad
+          prompt: prompt,
+          stream: false,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ollama no está corriendo. Debes iniciar: ollama serve");
+      }
+
+      const result = await response.json();
+      if (result.response) {
+        const feedbackLines = result.response
+          .split("\n")
+          .filter(line => line.trim().length > 0)
+          .slice(0, 5); // Primeras 5 líneas
+
+        setFeedback([
+          "🤖 Análisis con Ollama (IA Local)",
+          ...feedbackLines.map(line => line.trim())
+        ]);
+      }
+    } catch (err) {
+      console.error("Error con Ollama:", err.message);
+      setFeedback([
+        "⚠️ Ollama no está disponible",
+        "Para usar IA local, debes instalar Ollama y ejecutar: ollama serve",
+        "Instalación: https://ollama.ai",
+        "Luego en terminal: ollama pull mistral && ollama serve"
+      ]);
+      generateBasicFeedback();
+    }
+  };
+
+  // Feedback básico si falla IA
+  const generateBasicFeedback = () => {
+    const tips = [];
+    
+    if (fillerStats.count > 5) {
+      tips.push("⚠️ Muchas muletillas detectadas. Intenta hacer pausas silenciosas en lugar de llenar espacios.");
+    } else if (fillerStats.count > 0) {
+      tips.push("✓ Buen trabajo, pocas muletillas.");
+    }
+
+    if (poseStats.gestures < 10) {
+      tips.push("👋 Usa más gestos para enfatizar puntos clave.");
+    } else if (poseStats.gestures > 50) {
+      tips.push("✋ Muchos movimientos. Intenta gesticular más deliberadamente.");
+    }
+
+    if (poseStats.posture === 'excelente') {
+      tips.push("🎯 Excelente postura corporal.");
+    } else {
+      tips.push("📍 Mejora tu postura, mantén la cabeza erguida.");
+    }
+
+    setFeedback(tips);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 max-w-4xl mx-auto">
+      {step === 'intro' && (
+        <div className="space-y-6 text-center py-12">
+          <h2 className="text-3xl font-bold text-slate-800">Sesión de Oratoria Completa</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Grabaremos tu discurso analizando simultáneamente tu voz, gestos y movimiento corporal con IA.
+            Recibirás feedback detallado para mejorar tu expresión y eliminación de muletillas.
+          </p>
+          <div className="grid grid-cols-3 gap-4 mt-8">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <Mic className="mx-auto text-blue-600 mb-2" size={32} />
+              <p className="text-sm font-semibold">Análisis de Voz</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <Hand className="mx-auto text-green-600 mb-2" size={32} />
+              <p className="text-sm font-semibold">Detección de Gestos</p>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <Sparkles className="mx-auto text-purple-600 mb-2" size={32} />
+              <p className="text-sm font-semibold">Feedback con IA</p>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200 flex items-center gap-2">
+              <AlertTriangle size={18} />
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={startSession}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors flex items-center justify-center gap-2 mx-auto"
+          >
+            <Play size={24} /> Comenzar Sesión
+          </button>
+        </div>
+      )}
+
+      {step === 'recording' && (
+        <div className="space-y-6">
+          <div className="text-center py-8 space-y-4">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-25"></div>
+              <div className="bg-red-100 p-6 rounded-full relative z-10">
+                <Mic className="w-12 h-12 text-red-600 animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800">Grabando...</h2>
+            <p className="text-slate-600">Habla con claridad. Estamos analizando tu voz, gestos y postura.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <video
+                ref={videoRef}
+                className="w-full rounded-lg border-2 border-indigo-600 shadow-lg"
+                autoPlay
+                muted
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <p className="text-xs text-slate-500 font-semibold mb-2">TRANSCRIPCIÓN EN VIVO</p>
+                <p className="text-sm text-slate-700 h-24 overflow-y-auto">
+                  {transcript}
+                  <span className="text-slate-400 italic">{interimTranscript}</span>
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-blue-50 p-3 rounded">
+                  <p className="text-xs text-blue-600 font-semibold">Muletillas</p>
+                  <p className="text-xl font-bold text-blue-700">{fillerStats.count}</p>
+                </div>
+                <div className="bg-green-50 p-3 rounded">
+                  <p className="text-xs text-green-600 font-semibold">Gestos</p>
+                  <p className="text-xl font-bold text-green-700">{poseStats.gestures}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={stopSession}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <Square size={20} fill="currentColor" /> Terminar Grabación
+          </button>
+        </div>
+      )}
+
+      {step === 'results' && (
+        <div className="space-y-8">
+          <div className="text-center border-b border-slate-100 pb-6">
+            <h2 className="text-2xl font-bold text-slate-800">Resultados de tu Sesión</h2>
+            <p className="text-slate-600 mt-2">Análisis completado con IA</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+              <p className="text-blue-600 font-semibold mb-2">Muletillas</p>
+              <p className="text-4xl font-bold text-blue-700">{fillerStats.count}</p>
+              {fillerStats.found.length > 0 && (
+                <p className="text-xs text-blue-600 mt-2">
+                  Encontradas: {fillerStats.found.join(', ')}
+                </p>
+              )}
+            </div>
+            <div className="bg-green-50 p-6 rounded-xl border border-green-100">
+              <p className="text-green-600 font-semibold mb-2">Actividad de Gestos</p>
+              <p className="text-4xl font-bold text-green-700">{poseStats.gestures}%</p>
+            </div>
+            <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
+              <p className="text-purple-600 font-semibold mb-2">Postura</p>
+              <p className="text-2xl font-bold text-purple-700">{poseStats.posture}</p>
+            </div>
+          </div>
+
+          <div className="bg-indigo-50 p-6 rounded-lg border border-indigo-200 space-y-3">
+            <h3 className="font-semibold text-indigo-900">💡 Feedback con IA para Mejorar:</h3>
+            {feedback.map((tip, idx) => (
+              <p key={idx} className="text-indigo-800 text-sm leading-relaxed">
+                • {tip}
+              </p>
+            ))}
+          </div>
+
+          <button
+            onClick={() => {
+              setStep('intro');
+              setTranscript('');
+              setInterimTranscript('');
+              setFillerStats({ count: 0, found: [] });
+              setPoseStats({ posture: 'neutral', gestures: 0, engagement: 0 });
+              setFeedback([]);
+            }}
+            className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshCcw size={18} /> Nueva Sesión
+          </button>
+        </div>
+      )}
     </div>
   );
 };
