@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Play, Square, RefreshCcw, BookOpen, AlertTriangle, Sparkles } from 'lucide-react';
+import { Mic, Play, Square, RefreshCcw, BookOpen, AlertTriangle, Sparkles, Hand } from 'lucide-react';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 import { initializeHands, closeHands, analyzeHandGestures, drawHands } from './utils/handDetection';
 
