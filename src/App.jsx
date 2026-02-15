@@ -97,37 +97,41 @@ const CombinedSessionMode = () => {
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = 'es-ES';
+        recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
-          console.log('Speech Recognition iniciado');
+          console.log('✅ Speech Recognition iniciado correctamente');
+          isRecordingRef.current = true;
         };
 
         recognition.onresult = (event) => {
-          console.log('onresult triggered:', { isRecording: isRecordingRef.current, resultIndex: event.resultIndex, resultsLength: event.results.length });
+          console.log('🎯 onresult triggered - Resultados:', event.results.length);
           
           let finalChunk = '';
           let interimChunk = '';
 
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
-            console.log('Transcript chunk:', transcript, 'isFinal:', event.results[i].isFinal);
+            console.log('📝 Chunk:', transcript, '| Final:', event.results[i].isFinal);
             if (event.results[i].isFinal) {
               finalChunk += transcript + ' ';
             } else {
               interimChunk += transcript;
             }
           }
-
-          console.log('Final:', finalChunk, 'Interim:', interimChunk);
           
           if (finalChunk) {
             setTranscript(prev => prev + finalChunk);
+            console.log('💾 Guardando final:', finalChunk);
           }
-          setInterimTranscript(interimChunk);
+          if (interimChunk) {
+            setInterimTranscript(interimChunk);
+            console.log('🔄 Interim:', interimChunk);
+          }
         };
 
         recognition.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
+          console.error('❌ Speech recognition error:', event.error);
           if (event.error === 'not-allowed') {
             setError("❌ Acceso al micrófono denegado. Revisa permisos del navegador (icono candado).");
           } else if (event.error === 'network') {
@@ -138,7 +142,8 @@ const CombinedSessionMode = () => {
         };
 
         recognition.onend = () => {
-          console.log('Speech Recognition finalizado');
+          console.log('⏹️ Speech Recognition finalizado');
+          isRecordingRef.current = false;
         };
 
         recognitionRef.current = recognition;
@@ -151,7 +156,11 @@ const CombinedSessionMode = () => {
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          console.warn('Error en cleanup:', e);
+        }
       }
     };
   }, []);
@@ -225,10 +234,11 @@ const CombinedSessionMode = () => {
       // INICIAR RECONOCIMIENTO DE VOZ
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.abort(); // Reset antes de start
+          console.log('🎤 Iniciando reconocimiento de voz...');
           recognitionRef.current.start();
+          console.log('✅ start() llamado');
         } catch (e) {
-          console.warn('Recognition error:', e.message);
+          console.error('❌ Error en start():', e.message);
         }
       }
 
