@@ -103,13 +103,14 @@ const CombinedSessionMode = () => {
         };
 
         recognition.onresult = (event) => {
-          if (!isRecordingRef.current) return; // Solo procesar si estamos grabando
-
+          console.log('onresult triggered:', { isRecording: isRecordingRef.current, resultIndex: event.resultIndex, resultsLength: event.results.length });
+          
           let finalChunk = '';
           let interimChunk = '';
 
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
+            console.log('Transcript chunk:', transcript, 'isFinal:', event.results[i].isFinal);
             if (event.results[i].isFinal) {
               finalChunk += transcript + ' ';
             } else {
@@ -117,6 +118,8 @@ const CombinedSessionMode = () => {
             }
           }
 
+          console.log('Final:', finalChunk, 'Interim:', interimChunk);
+          
           if (finalChunk) {
             setTranscript(prev => prev + finalChunk);
           }
@@ -222,9 +225,10 @@ const CombinedSessionMode = () => {
       // INICIAR RECONOCIMIENTO DE VOZ
       if (recognitionRef.current) {
         try {
+          recognitionRef.current.abort(); // Reset antes de start
           recognitionRef.current.start();
         } catch (e) {
-          console.warn('Recognition ya está activo:', e.message);
+          console.warn('Recognition error:', e.message);
         }
       }
 
@@ -316,7 +320,7 @@ const CombinedSessionMode = () => {
     // Detener reconocimiento de voz
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch (e) {
         console.warn('Error deteniendo recognition:', e);
       }
