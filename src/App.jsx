@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Video, Play, Square, RefreshCcw, BookOpen, Activity, Volume2, AlertCircle, CheckCircle, Hand, AlertTriangle, Sparkles } from 'lucide-react';
+import { Mic, Play, Square, RefreshCcw, BookOpen, AlertTriangle, Sparkles } from 'lucide-react';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 import { initializeHands, closeHands, analyzeHandGestures, drawHands } from './utils/handDetection';
 
 const SpeechCoachApp = () => {
-  const [activeTab, setActiveTab] = useState('combined'); // 'combined', 'memorize', or 'camera'
+  const [activeTab, setActiveTab] = useState('memorize'); // 'combined' or 'memorize'
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-100 selection:text-indigo-800">
@@ -39,21 +39,11 @@ const SpeechCoachApp = () => {
           >
             <BookOpen size={16} /> Memorización
           </button>
-          <button
-            onClick={() => setActiveTab('camera')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
-              activeTab === 'camera' 
-                ? 'bg-white text-indigo-700 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Video size={16} /> Cámara y Gestos
-          </button>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto p-6">
-        {activeTab === 'combined' ? <CombinedSessionMode /> : activeTab === 'memorize' ? <MemorizeMode /> : <CameraMode />}
+        {activeTab === 'combined' ? <CombinedSessionMode /> : <MemorizeMode />}
       </main>
     </div>
   );
@@ -234,12 +224,18 @@ const CombinedSessionMode = () => {
       // INICIAR RECONOCIMIENTO DE VOZ
       if (recognitionRef.current) {
         try {
-          console.log('🎤 Iniciando reconocimiento de voz...');
+          console.log('🎤 Sesión Completa: Iniciando reconocimiento de voz...');
+          console.log('🔍 recognitionRef existe:', !!recognitionRef.current);
           recognitionRef.current.start();
-          console.log('✅ start() llamado');
+          console.log('✅ Sesión Completa: start() ejecutado exitosamente');
         } catch (e) {
-          console.error('❌ Error en start():', e.message);
+          console.error('❌ Sesión Completa Error en start():', e.message);
+          console.error('❌ Error completo:', e);
+          setError(`Error al iniciar micrófono: ${e.message}`);
         }
+      } else {
+        console.error('❌ Sesión Completa: recognitionRef.current es null');
+        setError('Error: micrófono no inicializado');
       }
 
       // Iniciar análisis de video
@@ -643,41 +639,54 @@ const MemorizeMode = () => {
       recognitionRef.current.lang = 'es-ES';
 
       recognitionRef.current.onresult = (event) => {
+        console.log('🎯 [Memorización] onresult - Resultados:', event.results.length);
         let finalChunk = '';
         let interimChunk = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const chunk = event.results[i][0].transcript;
+          console.log('📝 [Memorización] Chunk:', chunk, '| Final:', event.results[i].isFinal);
           if (event.results[i].isFinal) {
-            finalChunk += event.results[i][0].transcript + ' ';
+            finalChunk += chunk + ' ';
           } else {
-            interimChunk += event.results[i][0].transcript;
+            interimChunk += chunk;
           }
         }
 
         if (finalChunk) {
             setTranscript(prev => prev + finalChunk);
+            console.log('💾 [Memorización] Guardando final:', finalChunk);
         }
-        setInterimTranscript(interimChunk);
+        if (interimChunk) {
+          setInterimTranscript(interimChunk);
+          console.log('🔄 [Memorización] Interim:', interimChunk);
+        }
         setError(null);
       };
 
       recognitionRef.current.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
+        console.error('❌ [Memorización] Speech recognition error:', event.error);
         if (event.error === 'not-allowed') {
-          setError("Acceso al micrófono denegado. Por favor verifica los permisos del navegador (icono de candado en la barra de dirección).");
+          console.error('❌ Permisos denegados');
+          setError('❌ Acceso al micrófono denegado. Revisa permisos del navegador (icono candado).');
           setIsListening(false);
         } else if (event.error === 'no-speech') {
-          // Silencio normal, no mostrar error
+          console.log('⚠️ Sin detección de voz (silencio normal)');
         } else if (event.error === 'network') {
-           setError("Error de red. El reconocimiento de voz necesita internet.");
+          console.error('❌ Error de red');
+          setError('❌ Error de red. El reconocimiento necesita internet.');
         } else {
-          setError(`Error: ${event.error}`);
+          console.error('❌ Otro error:', event.error);
+          setError(`❌ Error: ${event.error}`);
         }
       };
 
+      recognitionRef.current.onstart = () => {
+        console.log('✅ [Memorización] Speech Recognition iniciado correctamente');
+      };
+
       recognitionRef.current.onend = () => {
-        // Simplemente marcar como no escuchando - el estado de React lo maneja stopRecording()
-        console.log("Speech recognition ended");
+        console.log('⏹️ [Memorización] Speech Recognition finalizado');
       };
 
     } else {
@@ -709,10 +718,20 @@ const MemorizeMode = () => {
     setError(null);
     setIsListening(true);
     try {
-        recognitionRef.current?.abort(); // Stop any previous instance
-        recognitionRef.current?.start();
+      console.log('🎤 [Memorización] Iniciando reconocimiento...');
+      console.log('🔍 recognitionRef existe:', !!recognitionRef.current);
+      
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+        console.log('✅ [Memorización] start() ejecutado exitosamente');
+      } else {
+        console.error('❌ [Memorización] recognitionRef es null');
+        setError('Error: micrófono no disponible');
+      }
     } catch (e) {
-        console.error(e);
+        console.error('❌ [Memorización] Error:', e.message);
+        console.error('❌ Error completo:', e);
+        setError(`Error al iniciar: ${e.message}`);
     }
   };
 
@@ -926,240 +945,6 @@ const MemorizeMode = () => {
           </button>
         </div>
       )}
-    </div>
-  );
-};
-
-// --- MODO CÁMARA (SIMULACIÓN DE ANÁLISIS) ---
-
-const CameraMode = () => {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null); // Para análisis de movimiento
-  const streamRef = useRef(null);
-  const [isActive, setIsActive] = useState(false);
-  const [feedback, setFeedback] = useState([]);
-  const [motionLevel, setMotionLevel] = useState(0);
-  const [audioLevel, setAudioLevel] = useState(0);
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const lastImageDataRef = useRef(null);
-
-  // Iniciar Cámara
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true 
-      });
-      
-      videoRef.current.srcObject = stream;
-      streamRef.current = stream;
-      
-      // Esperar a que el video esté listo antes de continuar
-      await new Promise(resolve => {
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play();
-          resolve();
-        };
-      });
-      
-      setIsActive(true);
-      setFeedback(['Calibrando análisis corporal...', 'Escuchando tono de voz...']);
-      
-      // Iniciar después de que el video está listo
-      setupAudioAnalysis(stream);
-      analyzeLoop();
-
-    } catch (err) {
-      console.error(err);
-      if (err.name === 'NotAllowedError') {
-        alert("Acceso denegado. Revisa los permisos de cámara en la barra de dirección (icono de candado).");
-      } else if (err.name === 'NotFoundError') {
-        alert("No se encontró cámara en tu dispositivo.");
-      } else {
-        alert("Error al acceder a la cámara: " + err.message);
-      }
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-    setIsActive(false);
-    setMotionLevel(0);
-    setAudioLevel(0);
-  };
-
-  // Configurar análisis de audio
-  const setupAudioAnalysis = (stream) => {
-    audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-    const source = audioContextRef.current.createMediaStreamSource(stream);
-    analyserRef.current = audioContextRef.current.createAnalyser();
-    source.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
-
-    analyserRef.current.fftSize = 2048;
-    const bufferLength = analyserRef.current.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const getAudioLevel = () => {
-      analyserRef.current.getByteFrequencyData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i];
-      }
-      const average = sum / bufferLength;
-      setAudioLevel(average);
-      requestAnimationFrame(getAudioLevel);
-    };
-
-    getAudioLevel();
-  };
-
-  // Bucle de análisis
-  const analyzeLoop = () => {
-    if (!isActive) return;
-    if (canvasRef.current && videoRef.current) {
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      const video = videoRef.current;
-
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      let motion = 0;
-      let total = 0;
-
-      // Comparar con el último frame para detectar movimiento
-      if (lastImageDataRef.current) {
-        const lastData = lastImageDataRef.current.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const diff = Math.abs(data[i] - lastData[i]) + Math.abs(data[i + 1] - lastData[i + 1]) + Math.abs(data[i + 2] - lastData[i + 2]);
-          motion += diff;
-          total += 255 * 3; // Máximo posible por pixel (R+G+B)
-        }
-      }
-
-      lastImageDataRef.current = imageData;
-
-      // Calcular nivel de movimiento (0 a 100)
-      const motionPercentage = (motion / total) * 100;
-      setMotionLevel(motionPercentage);
-
-      // Feedback básico
-      if (motionPercentage > 10) {
-        setFeedback(prev => [...prev, "Movimiento detectado"]);
-      } else {
-        setFeedback(prev => prev.filter(msg => msg !== "Movimiento detectado"));
-      }
-    }
-
-    animationFrameRef.current = requestAnimationFrame(analyzeLoop);
-  };
-
-  // Generar Feedback basado en métricas cada 2 segundos
-  useEffect(() => {
-    if (!isActive) return;
-
-    const interval = setInterval(() => {
-        const newFeedback = [];
-        
-        // Lógica de Movimiento
-        if (motionLevel > 40) {
-            newFeedback.push("⚠️ Mucho movimiento: Intenta anclar tus pies al suelo.");
-            newFeedback.push("✋ Tus manos se mueven muy rápido, úsalas deliberadamente.");
-        } else if (motionLevel < 5) {
-            newFeedback.push("⚠️ Demasiado estático: Relaja los hombros.");
-            newFeedback.push("👋 Usa tus manos para enfatizar puntos clave.");
-        } else {
-            newFeedback.push("✅ Buen control corporal.");
-        }
-
-        // Lógica de Audio
-        if (audioLevel > 50) {
-            newFeedback.push("🗣️ ¡Buena proyección de voz!");
-        } else if (audioLevel < 10) {
-            newFeedback.push("📢 Sube el volumen, no se te escucha bien.");
-        } else {
-            newFeedback.push("ℹ️ Intenta variar tu entonación para no sonar monótono.");
-        }
-
-        setFeedback(newFeedback);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isActive]);
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 max-w-3xl mx-auto">
-      <div className="text-center space-y-4 mb-8">
-        <h2 className="text-2xl font-bold text-slate-800">Modo Cámara</h2>
-        <p className="text-slate-500 text-sm">
-          Practica tu discurso frente a la cámara. Recibirás análisis en tiempo real sobre tu{" "}
-          <span className="font-semibold text-slate-800">movimiento</span> y{" "}
-          <span className="font-semibold text-slate-800">entonación</span>.
-        </p>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex-1">
-          <video
-            ref={videoRef}
-            className="w-full rounded-lg border border-slate-200"
-            autoPlay
-            muted
-          ></video>
-        </div>
-        <div className="flex-1">
-          <canvas
-            ref={canvasRef}
-            className="w-full h-64 rounded-lg border border-slate-200"
-          ></canvas>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <button
-          onClick={isActive ? stopCamera : startCamera}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
-        >
-          {isActive ? (
-            <>
-              <Square size={18} /> Detener Análisis
-            </>
-          ) : (
-            <>
-              <Play size={18} /> Iniciar Práctica
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Feedback y métricas */}
-      <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">Feedback en Tiempo Real</h3>
-        <div className="space-y-2">
-          {feedback.length === 0 ? (
-            <p className="text-slate-500 text-sm">Sin análisis aún. Inicia la práctica para recibir feedback.</p>
-          ) : (
-            feedback.map((msg, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-sm">
-                <Hand className="text-indigo-600 w-5 h-5 shrink-0" />
-                <p className="text-slate-700">{msg}</p>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 };
