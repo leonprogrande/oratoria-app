@@ -1,9 +1,9 @@
-# 🎤 Oratoria Pro - Setup Rápido
+﻿# ðŸŽ¤ Oratoria Pro - Setup RÃ¡pido
 
-## ⚡ Quick Start (5 minutos)
+## âš¡ Quick Start (5 minutos)
 
-### 1️⃣ Instalar Ollama
-Ejecuta este archivo en la raíz del proyecto:
+### 1ï¸âƒ£ Instalar Ollama
+Ejecuta este archivo en la raÃ­z del proyecto:
 ```bash
 instalar-ollama.bat
 ```
@@ -13,17 +13,17 @@ O manualmente:
 - Instalar
 - En terminal: `ollama pull mistral`
 
-### 2️⃣ Iniciar Ollama
+### 2ï¸âƒ£ Iniciar Ollama
 Abre una terminal y ejecuta:
 ```bash
 ollama serve
 ```
 
-Verás: `Server listening on 127.0.0.1:11434`
+VerÃ¡s: `Server listening on 127.0.0.1:11434`
 
-**⚠️ Mantén esta terminal abierta mientras usas la app**
+**âš ï¸ MantÃ©n esta terminal abierta mientras usas la app**
 
-### 3️⃣ Iniciar la App
+### 3ï¸âƒ£ Iniciar la App
 En OTRA terminal:
 ```bash
 npm run dev
@@ -31,111 +31,114 @@ npm run dev
 
 Abre: http://localhost:5173
 
-### 4️⃣ Usar la Sesión Completa
-1. Haz clic en la pestaña **"Sesión Completa"** (arriba)
-2. Haz clic en **"Comenzar Sesión"**
-3. Permite cámara + micrófono
+### 4ï¸âƒ£ Usar la SesiÃ³n Completa
+1. Haz clic en la pestaÃ±a **"SesiÃ³n Completa"** (arriba)
+2. Haz clic en **"Comenzar SesiÃ³n"**
+3. Permite cÃ¡mara + micrÃ³fono
 4. **Habla durante 1-2 minutos**
-5. Haz clic en **"Terminar Grabación"**
-6. **¡Espera 2-5 segundos** para el análisis con IA
+5. Haz clic en **"Terminar GrabaciÃ³n"**
+6. **Â¡Espera 2-5 segundos** para el anÃ¡lisis con IA
 7. Ver feedback personalizado
 
 ---
 
-## 🎯 Qué Analiza
+## ðŸŽ¯ QuÃ© Analiza
 
-✅ **Muletillas** - Palabras relleno (eh, este, o sea, etc.)
-✅ **Gestos** - Actividad de manos y brazos
-✅ **Postura** - Alineación de cabeza y hombros
-✅ **IA Feedback** - Recomendaciones personalizadas
+âœ… **Muletillas** - Palabras relleno (eh, este, o sea, etc.)
+âœ… **Gestos** - Actividad de manos y brazos
+âœ… **Postura** - AlineaciÃ³n de cabeza y hombros
+âœ… **IA Feedback** - Recomendaciones personalizadas
 
 ---
 
-## 🏗️ Arquitectura
+## ðŸ—ï¸ Arquitectura
 
 ```
 Frontend (React 19 + Vite)
-    ↓
-    ├─ Web Speech Recognition API (Local)
-    ├─ TensorFlow.js + MediaPipe Pose (Local)
-    └─ Web Audio API (Local)
-    ↓
+    â†“
+    â”œâ”€ Web Speech Recognition API (Local)
+    â”œâ”€ TensorFlow.js + MediaPipe Pose (Local)
+    â””â”€ Web Audio API (Local)
+    â†“
 Ollama Local API (http://localhost:11434)
-    ↓
+    â†“
 AI Models (Mistral, Phi, Neural-Chat, etc.)
 ```
 
 ---
 
-## 📁 Estructura del Proyecto
+## ðŸ“ Estructura del Proyecto
 
 ```
 oratoria-app/
-├── src/
-│   ├── App.jsx                 ← Código principal (3 componentes)
-│   ├── App.css
-│   ├── index.css
-│   └── main.jsx
-├── public/
-├── .github/
-│   └── copilot-instructions.md ← Guía para AI agents
-├── OLLAMA_SETUP.md             ← Setup detallado de Ollama
-├── IA_SETUP.md                 ← Comparativa de IA options
-├── instalar-ollama.bat         ← Script de instalación
-├── vite.config.js
-├── tailwind.config.js
-├── package.json
-└── README.md
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ App.jsx                 â† CÃ³digo principal (3 componentes)
+â”‚   â”œâ”€â”€ index.css
+â”‚   â”œâ”€â”€ constants/
+â”‚   â”‚   â””â”€â”€ fillers.js
+â”‚   â”œâ”€â”€ utils/
+â”‚   â”‚   â””â”€â”€ handDetection.js
+â”‚   â””â”€â”€ main.jsx
+â”œâ”€â”€ public/
+â”œâ”€â”€ .github/
+â”‚   â””â”€â”€ copilot-instructions.md â† GuÃ­a para AI agents
+â”œâ”€â”€ OLLAMA_SETUP.md             â† Setup detallado de Ollama
+â”œâ”€â”€ IA_SETUP.md                 â† Comparativa de IA options
+â”œâ”€â”€ instalar-ollama.bat         â† Script de instalaciÃ³n
+â”œâ”€â”€ vite.config.js
+â”œâ”€â”€ tailwind.config.js
+â”œâ”€â”€ package.json
+â””â”€â”€ README.md
 ```
 
 ---
 
-## 🔧 Componentes React
+## ðŸ”§ Componentes React
 
 ### 1. **SpeechCoachApp** (Root)
-- Navación con 3 tabs
+- NavaciÃ³n con 3 tabs
 - Renderiza el componente activo
 
 ### 2. **CombinedSessionMode** (NUEVO)
-- Sesión completa con IA
+- SesiÃ³n completa con IA
 - Graba video + audio
 - Analiza muletillas, gestos, postura
 - Genera feedback con Ollama
 
 ### 3. **MemorizeMode** (Existente)
-- Memorización de texto
-- Detección de muletillas
-- Análisis sin IA
+- MemorizaciÃ³n de texto
+- DetecciÃ³n de muletillas
+- AnÃ¡lisis sin IA
 
 ### 4. **CameraMode** (Existente)
-- Análisis de movimiento
-- Análisis de audio
-- Feedback básico en tiempo real
+- AnÃ¡lisis de movimiento
+- AnÃ¡lisis de audio
+- Feedback bÃ¡sico en tiempo real
 
 ---
 
-## 🚀 Comandos Útiles
+## ðŸš€ Comandos Ãštiles
 
 ```bash
 # Desarrollo
 npm run dev              # Inicia servidor en http://localhost:5173
 
 # Build
-npm run build           # Crea dist/ para producción
+npm run build           # Crea dist/ para producciÃ³n
 npm run preview         # Sirve dist/ localmente
 
 # Linting
-npm run lint            # Valida código con ESLint
+npm run lint            # Valida cÃ³digo con ESLint
 
 # Ollama
 ollama serve            # Inicia API local (puerto 11434)
 ollama pull mistral     # Descarga modelo Mistral
-ollama pull phi         # Descarga modelo Phi (más rápido)
+ollama pull phi         # Descarga modelo Phi (mÃ¡s rÃ¡pido)
 ```
 
 ---
 
-## 🔌 Dependencias Principales
+## ðŸ”Œ Dependencias Principales
 
 ```json
 {
@@ -144,13 +147,14 @@ ollama pull phi         # Descarga modelo Phi (más rápido)
   "lucide-react": "^0.563.0",                   // Icons
   "@tensorflow/tfjs": "latest",                 // ML framework
   "@tensorflow-models/pose-detection": "latest", // Pose detection
-  "@mediapipe/pose": "latest"                   // MediaPipe models
+  "@mediapipe/hands": "latest",                  // Hand detection
+  "@mediapipe/camera_utils": "latest"            // Camera helper
 }
 ```
 
 ---
 
-## 🎨 UI Features
+## ðŸŽ¨ UI Features
 
 - **Tailwind CSS**: Styling (sin custom CSS)
 - **Color scheme**: Indigo primary, slate neutrals
@@ -160,22 +164,22 @@ ollama pull phi         # Descarga modelo Phi (más rápido)
 
 ---
 
-## 📊 Métricas Capturadas
+## ðŸ“Š MÃ©tricas Capturadas
 
-### Por Sesión:
+### Por SesiÃ³n:
 - `transcript`: Texto completo de lo grabado
 - `fillerStats.count`: Total de muletillas
-- `fillerStats.found`: Lista de muletillas únicas
+- `fillerStats.found`: Lista de muletillas Ãºnicas
 - `poseStats.gestures`: Porcentaje de actividad (0-100%)
 - `poseStats.posture`: Calidad de postura ('neutral' o 'excelente')
 - `feedback`: Array de consejos de IA
 
 ---
 
-## ⚙️ Configuración
+## âš™ï¸ ConfiguraciÃ³n
 
 ### Cambiar Modelo de Ollama
-Edita `App.jsx` línea ~130:
+Edita `App.jsx` lÃ­nea ~130:
 ```javascript
 model: "mistral"  // Cambia a: phi, neural-chat, llama2
 ```
@@ -186,53 +190,54 @@ temperature: 0.7  // 0.0 (determinista) a 1.0 (creativo)
 ```
 
 ### Modificar Muletillas Detectadas
-Edita `App.jsx` línea ~253 (arreglo `fillers`):
+Edita `App.jsx` lÃ­nea ~253 (arreglo `fillers`):
 ```javascript
 const fillers = ['eh', 'em', 'mm', 'este', ...];
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## ðŸ› Troubleshooting
 
-| Problema | Solución |
+| Problema | SoluciÃ³n |
 |----------|----------|
-| "Ollama no está disponible" | Ejecuta `ollama serve` en otra terminal |
-| Cámara/micrófono no funciona | Revisa permisos del navegador (icono candado) |
+| "Ollama no estÃ¡ disponible" | Ejecuta `ollama serve` en otra terminal |
+| CÃ¡mara/micrÃ³fono no funciona | Revisa permisos del navegador (icono candado) |
 | Muy lento | Usa modelo `phi` en lugar de `mistral` |
 | Errores de memoria | Cierra otras apps, usa `phi` |
 | No aparece feedback IA | Espera 5-10 segundos, revisa consola (F12) |
 
 ---
 
-## 📚 Documentación Adicional
+## ðŸ“š DocumentaciÃ³n Adicional
 
 - **OLLAMA_SETUP.md** - Setup detallado de Ollama
 - **IA_SETUP.md** - Comparativa de opciones de IA
-- **.github/copilot-instructions.md** - Guía para AI agents
+- **.github/copilot-instructions.md** - GuÃ­a para AI agents
 
 ---
 
-## 🎓 Próximas Features
+## ðŸŽ“ PrÃ³ximas Features
 
 - [ ] Guardar sesiones en localStorage
 - [ ] Exportar resultados como PDF
-- [ ] Análisis de emociones
+- [ ] AnÃ¡lisis de emociones
 - [ ] Comparar sesiones anteriores
-- [ ] Versión de escritorio (Electron/Tauri)
+- [ ] VersiÃ³n de escritorio (Electron/Tauri)
 
 ---
 
-## 📄 Licencia
+## ðŸ“„ Licencia
 
 MIT - Libre para uso personal y comercial
 
 ---
 
-## 🤝 Contribuciones
+## ðŸ¤ Contribuciones
 
-¡Bienvenido contribuir! Abre un issue o PR en GitHub.
+Â¡Bienvenido contribuir! Abre un issue o PR en GitHub.
 
 ---
 
-**Hecho con ❤️ para oradores que quieren mejorar** 🎤✨
+**Hecho con â¤ï¸ para oradores que quieren mejorar** ðŸŽ¤âœ¨
+

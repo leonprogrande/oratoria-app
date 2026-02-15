@@ -1,0 +1,16 @@
+export const SPEECH_FILLERS = [
+  'eh',
+  'em',
+  'mm',
+  'este',
+  'o sea',
+  'bueno',
+  'tipo',
+  'sabes',
+  'literal',
+  'digamos',
+  'básicamente',
+  'mhm',
+  'eee',
+  'ahh',
+];

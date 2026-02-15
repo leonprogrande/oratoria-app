@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Play, Square, RefreshCcw, BookOpen, AlertTriangle, Sparkles, Hand } from 'lucide-react';
+import { Mic, Play, Square, RefreshCcw, BookOpen, AlertTriangle, AlertCircle, CheckCircle, Sparkles, Hand } from 'lucide-react';
 import * as poseDetection from '@tensorflow-models/pose-detection';
 import { initializeHands, closeHands, analyzeHandGestures, drawHands } from './utils/handDetection';
+import { SPEECH_FILLERS } from './constants/fillers';
 
 const SpeechCoachApp = () => {
   const [activeTab, setActiveTab] = useState('memorize'); // 'combined' or 'memorize'
@@ -53,7 +54,6 @@ const SpeechCoachApp = () => {
 
 const CombinedSessionMode = () => {
   const [step, setStep] = useState('intro'); // intro, recording, results
-  const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [fillerStats, setFillerStats] = useState({ count: 0, found: [] });
@@ -72,7 +72,6 @@ const CombinedSessionMode = () => {
   const detectorRef = useRef(null);
   const handsRef = useRef(null);
   const animationFrameRef = useRef(null);
-  const lastImageDataRef = useRef(null);
   const poseHistoryRef = useRef([]);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -263,7 +262,7 @@ const CombinedSessionMode = () => {
 
   // Analizar video (pose detection)
   const analyzeVideo = async () => {
-    if (!isRecording && !recording) return;
+    if (!recording) return;
 
     if (detectorRef.current && videoRef.current && canvasRef.current) {
       try {
@@ -273,7 +272,6 @@ const CombinedSessionMode = () => {
         if (pose && pose.keypoints) {
           // Analizar postura
           const leftShoulder = pose.keypoints.find(k => k.name === 'left_shoulder');
-          const rightShoulder = pose.keypoints.find(k => k.name === 'right_shoulder');
           const head = pose.keypoints.find(k => k.name === 'nose');
 
           // Detectar gestos (movimiento de manos)
@@ -360,9 +358,8 @@ const CombinedSessionMode = () => {
 
   // Contar muletillas
   const analyzeMuletillas = (text) => {
-    const fillers = ['eh', 'em', 'mm', 'este', 'o sea', 'bueno', 'tipo', 'sabes', 'literal', 'digamos', 'básicamente', 'mhm', 'eee', 'ahh'];
     const words = text.toLowerCase().split(/\s+/);
-    const foundFillers = words.filter(word => fillers.includes(word.replace(/[^a-záéíóúñ]/g, '')));
+    const foundFillers = words.filter(word => SPEECH_FILLERS.includes(word.replace(/[^a-záéíóúñ]/g, '')));
 
     setFillerStats({
       count: foundFillers.length,
@@ -624,14 +621,20 @@ const MemorizeMode = () => {
   const [transcript, setTranscript] = useState(''); // Texto finalizado
   const [interimTranscript, setInterimTranscript] = useState(''); // Texto en proceso
   const [isListening, setIsListening] = useState(false);
-  const [error, setError] = useState(null); // Nuevo estado para errores
+  const supportsSpeechRecognition =
+    'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  const [error, setError] = useState(
+    supportsSpeechRecognition
+      ? null
+      : "Tu navegador no soporta reconocimiento de voz. Por favor usa Chrome o Edge.",
+  );
   const [fillerStats, setFillerStats] = useState({ count: 0, found: [] });
   
   // Reconocimiento de voz setup
   const recognitionRef = useRef(null);
 
    useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    if (supportsSpeechRecognition) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
@@ -689,20 +692,25 @@ const MemorizeMode = () => {
         console.log('⏹️ [Memorización] Speech Recognition finalizado');
       };
 
-    } else {
-      setError("Tu navegador no soporta reconocimiento de voz. Por favor usa Chrome o Edge.");
     }
-  }, []);
+  }, [supportsSpeechRecognition]);
 
   useEffect(() => {
-    let interval;
-    if (step === 'memorizing' && timer > 0) {
-      interval = setInterval(() => setTimer(t => t - 1), 1000);
-    } else if (step === 'memorizing' && timer === 0) {
-      setStep('recording');
-    }
+    if (step !== 'memorizing') return undefined;
+
+    const interval = setInterval(() => {
+      setTimer((currentTimer) => {
+        if (currentTimer <= 1) {
+          clearInterval(interval);
+          setStep('recording');
+          return 0;
+        }
+        return currentTimer - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(interval);
-  }, [step, timer]);
+  }, [step]);
 
   const startMemorizing = () => {
     if (!text.trim()) return;
@@ -746,9 +754,8 @@ const MemorizeMode = () => {
   };
 
   const analyzeSpeech = (speechText) => {
-    const fillers = ['eh', 'em', 'mm', 'este', 'o sea', 'bueno', 'tipo', 'sabes', 'literal', 'digamos', 'básicamente', 'mhm'];
     const words = speechText.toLowerCase().split(/\s+/);
-    const foundFillers = words.filter(word => fillers.includes(word.replace(/[^a-záéíóúñ]/g, '')));
+    const foundFillers = words.filter(word => SPEECH_FILLERS.includes(word.replace(/[^a-záéíóúñ]/g, '')));
     
     setFillerStats({
       count: foundFillers.length,
@@ -900,7 +907,7 @@ const MemorizeMode = () => {
                 <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-lg leading-relaxed">
                 {transcript.split(' ').map((word, idx) => {
                     const cleanWord = word.toLowerCase().replace(/[^a-záéíóúñ]/g, '');
-                    const isFiller = ['eh', 'em', 'mm', 'este', 'o sea', 'bueno', 'tipo', 'sabes'].includes(cleanWord);
+                    const isFiller = SPEECH_FILLERS.includes(cleanWord);
                     return (
                     <span key={idx} className={isFiller ? "bg-red-200 text-red-800 px-1 rounded mx-0.5 font-bold inline-block" : "mx-0.5 inline-block"}>
                         {word}

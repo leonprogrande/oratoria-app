@@ -50,8 +50,6 @@ export const analyzeHandGestures = (results) => {
   }
 
   const landmarks = results.multiHandLandmarks;
-  const handedness = results.multiHandedness || [];
-
   let openPalms = 0;
   let pointingGestures = 0;
   let totalHandMotion = 0;
